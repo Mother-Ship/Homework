@@ -1,5 +1,6 @@
-package _20181028;
+package _20181028.ver8;
 
+import _20181028.Console;
 import javafx.application.Application;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -17,30 +18,9 @@ import javafx.stage.Stage;
 
 import java.io.PrintStream;
 import java.time.Instant;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLong;
 
 public class App extends Application {
-    private static AtomicLong counter = new AtomicLong(0);
-    private static Thread thread;
-    private static boolean paused = false;
-
-    private final Thread lockThread = new Thread(
-            () -> {
-                while (true){
-                    if (paused){
-                        synchronized (this){
-                            try {
-                                this.wait();
-                            } catch (InterruptedException e) {
-                                e.printStackTrace();
-                            }
-                        }
-                    }
-                }
-            }
-    );
-
+    private PrinterThread thread = new PrinterThread();
     public static void main(String[] args) {
         launch(args);
     }
@@ -83,30 +63,9 @@ public class App extends Application {
         gridpane.setVgap(10);
         Button btn = new Button("暂停");
 
-        btn.setOnAction(
-                event -> {
-                    if (paused) {
-                        //调用被废弃的、不释放锁的暂停/继续方法勉强可以实现，但是不优雅
-                        //而使用Object.wait()方式，又会导致UI线程也被阻塞（UI线程必须先拿到对象锁后，才能阻塞所有拿到这个锁的线程）
-                        //新思路，写一个会卡死的线程，如果点继续就让那个线程继续跑（也会让当前线程卡死）
-//                        thread.resume();
-                        paused = false;
-                        synchronized (lockThread){
-                            lockThread.notifyAll();
-                        }
-                        btn.setText("暂停");
-                    } else {
-//                        thread.suspend();
-                        paused = true;
-                        try {
-                            lockThread.join();
-                        } catch (InterruptedException e) {
-                            e.printStackTrace();
-                        }
-                        btn.setText("继续");
-                    }
-                }
-        );
+        btn.setOnAction(new EventHandler(thread,btn));
+
+
         HBox hbBtn = new HBox(10);
         hbBtn.setAlignment(Pos.BOTTOM_RIGHT);
         hbBtn.getChildren().add(btn);
@@ -120,20 +79,7 @@ public class App extends Application {
         primaryStage.setResizable(false);
 
         System.out.println(Instant.now() + " Starting...");
-        thread = new Thread(
-                () -> {
-                    synchronized (lockThread) {
-                        while (true) {
-                            System.out.println(Instant.now() + "   " + counter.getAndIncrement());
-                            try {
-                                TimeUnit.SECONDS.sleep(1);
-                            } catch (InterruptedException e) {
-                                e.printStackTrace();
-                            }
-                        }
-                    }
-                }
-        );
+
         thread.start();
     }
 

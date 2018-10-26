@@ -10,7 +10,7 @@ public class Console extends OutputStream {
 
     private TextArea output;
 
-    Console(TextArea ta) {
+    public Console(TextArea ta) {
         this.output = ta;
     }
 
