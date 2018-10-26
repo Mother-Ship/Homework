@@ -21,10 +21,25 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 public class App extends Application {
-    private static final Object myLock = new Object();
     private static AtomicLong counter = new AtomicLong(0);
     private static Thread thread;
     private static boolean paused = false;
+
+    private final Thread lockThread = new Thread(
+            () -> {
+                while (true){
+                    if (paused){
+                        synchronized (this){
+                            try {
+                                this.wait();
+                            } catch (InterruptedException e) {
+                                e.printStackTrace();
+                            }
+                        }
+                    }
+                }
+            }
+    );
 
     public static void main(String[] args) {
         launch(args);
@@ -71,21 +86,24 @@ public class App extends Application {
         btn.setOnAction(
                 event -> {
                     if (paused) {
-                        synchronized (myLock) {
-                            myLock.notifyAll();
-                        }
+                        //调用被废弃的、不释放锁的暂停/继续方法勉强可以实现，但是不优雅
+                        //而使用Object.wait()方式，又会导致UI线程也被阻塞（UI线程必须先拿到对象锁后，才能阻塞所有拿到这个锁的线程）
+                        //新思路，写一个会卡死的线程，如果点继续就让那个线程继续跑（也会让当前线程卡死）
+//                        thread.resume();
                         paused = false;
+                        synchronized (lockThread){
+                            lockThread.notifyAll();
+                        }
                         btn.setText("暂停");
                     } else {
+//                        thread.suspend();
+                        paused = true;
                         try {
-                            synchronized (myLock) {
-                                thread.wait();
-                            }
-                            paused = true;
-                            btn.setText("继续");
+                            lockThread.join();
                         } catch (InterruptedException e) {
                             e.printStackTrace();
                         }
+                        btn.setText("继续");
                     }
                 }
         );
@@ -104,22 +122,19 @@ public class App extends Application {
         System.out.println(Instant.now() + " Starting...");
         thread = new Thread(
                 () -> {
-                    while (true) {
-                        //let this thread get the Object lock of myLock
-                        synchronized (myLock) {
+                    synchronized (lockThread) {
+                        while (true) {
                             System.out.println(Instant.now() + "   " + counter.getAndIncrement());
                             try {
-                                TimeUnit.SECONDS.sleep(3);
+                                TimeUnit.SECONDS.sleep(1);
                             } catch (InterruptedException e) {
                                 e.printStackTrace();
                             }
-
                         }
                     }
                 }
         );
         thread.start();
-
-
     }
+
 }
