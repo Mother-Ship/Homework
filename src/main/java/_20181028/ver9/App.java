@@ -1,4 +1,4 @@
-package _20181028.ver1;
+package _20181028.ver9;
 
 import _20181028.Console;
 import javafx.application.Application;
@@ -79,6 +79,7 @@ public class App extends Application {
         primaryStage.setResizable(false);
 
         System.out.println(Instant.now() + " Starting...");
+
         thread.start();
     }
 
